@@ -32,18 +32,6 @@ export async function fetchAllPeople(): Promise<Person[]> {
   return [];
 }
 
-export async function fetchPeoplePage(page: number): Promise<Page<Person>> {
-  const res = await fetch(`${BASE}people?page=${page}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-export async function searchPeople(query: string): Promise<Page<Person>> {
-  const res = await fetch(`${BASE}people?search=${encodeURIComponent(query)}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
 export async function fetchCharacter(id: string): Promise<Person> {
   const res = await fetch(`${BASE}people/${id}/`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
