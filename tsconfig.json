@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "ESNext",
+    "jsx": "react-jsx",            // 👈 Enables JSX in .tsx
+    "moduleResolution": "Node",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}
