@@ -1,172 +1,137 @@
-*********  Architecture & Approach *********
-1) UI Layer (React Components)
+# Star Wars Characters (React + TypeScript + Vite)
 
-Pages: CharacterList, CharacterDetails, Favourites
+A small Star Wars directory app:
 
-Role: Presentation + user interaction only.
+- **Characters list** with search, client-side pagination, and **Home Planet** resolution  
+- **Character details** (Hair/Eye/Gender/Home Planet) + **Films** + **Starships**  
+- **Favourites** stored in `localStorage` (toggle in details page)  
+- Route guard to support **hard refresh/deep links** (preload people before rendering)
 
-Notes:
+> Built with **React 19**, **Vite 7**, **TypeScript 5**, **react-router-dom 7**, **Jest** + **@testing-library**.
 
-CharacterList shows Homeworld name (resolved via API).
+---
 
-CharacterDetails reads the person from in-memory store, fetches planet/films/starships names, and provides a toggle Favourite button (localStorage-backed).
+## Architecture & Approach
 
-2) State & Data Layer
+**UI Layer (React pages)**  
+- `CharacterList` — table + search + client-side pagination; resolves `homeworld` names  
+- `CharacterDetails` — reads person from context, fetches planet/films/starships, toggles favourite  
+- `Favourites` — displays saved favourites
 
-PeopleProvider (context/PeopleProvider.tsx):
+**State & Data Layer**  
+- `PeopleProvider` — preloads all people once on app start (`fetchAllPeople()`), builds `byId`, exposes `getById(id)`  
+- `RequirePeople` — gates `/characters/*` until preload finishes (handles hard refresh / deep link)  
+- Local component state — search, pagination; favourites synced to `localStorage`
 
-Preloads all people once on app start (fetchAllPeople()).
+**API Layer (`features/characters/api.ts`)**  
+- `fetchAllPeople()` — full list (no server pagination)  
+- `fetchPlanet(url)` — returns `{ name }`  
+- `fetchFilms(urls[])` — batch fetch film titles  
+- `fetchStarships(urls[])` — batch fetch starship names
 
-Builds an byId map and exposes getById(id).
+---
 
-Route Guard (RequirePeople):
+## 📂 Project Structure (high level)
 
-Gates /characters routes until preload finishes (handles hard refresh/deep link).
+src/
+    App.tsx
+    App.css
+    main.tsx
+    context/
+        PeopleProvider.tsx
+        usePeople.ts
+        personIdFromUrl.ts
+    features/
+        characters/
+            api.ts
+            pages/
+                CharacterList.tsx
+                CharacterDetails.tsx
+                Favourites.tsx
+    mocks/
+        mockCharacters.ts
+    hooks/
+        useDebounce.ts
+    __tests__
+        CharacterList.test.tsx
+        CharacterDetails.test.tsx
+        Favourites.test.tsx
+    setupTests.ts
+    vite.config.ts
 
-Local state: component UI state (search, pagination), localStorage sync for favourites.
 
-(Optional) useDebounce:
+## ▶️ Run the project locally
 
-Not required with current client-side search, but ready if we move to server-side search.
+**Prereqs**: Node 18+
 
-3) API Layer (features/characters/api.ts)
+```bash
+# install dependencies
+npm install
 
-Endpoints in use:
+# start dev server (Vite)
+npm run dev
+# -> http://localhost:5173
 
-fetchAllPeople() — loads the full list (no server pagination).
+# run unit tests (Jest)
+npm test
 
-fetchPlanet(url) — returns { name } (with a small in-memory cache recommended).
+# production build
+npm run build
 
-fetchFilms(urls[]) — batch-fetch film titles.
+# serve built files locally
+npm run preview
+```
 
-fetchStarships(urls[]) — batch-fetch starship names.
+# Testing (Jest + Testing Library)
 
+Command: npm test (Jest, coverage enabled in script)
 
+DOM helpers: @testing-library/react, @testing-library/jest-dom
 
+Setup: src/setupTests.ts (adds jest-dom, TextEncoder/Decoder, mocks fetch)
 
 
-*********  Additional Considerations *********
+# Code Style & Types
 
-1. Maintainability
+TypeScript strict mode recommended
 
-Modular structure:
+ESLint configured for React hooks and refresh
 
-features/c1) Maintainability
+Shared types for domain models (Person, Planet, Film, Starship) live under features/characters or can be moved to a @types package if this grows
 
-Clear boundaries:
 
-features/characters/api.ts → networking
 
-features/characters/pages/ → UI
+# Known Limitations 
 
-context/ → app data store
+No server pagination — list is client-filtered/paginated (OK for current data size).
+If SWAPI grows, move to server-side pagination; UI is API-agnostic enough to swap.
 
-hooks/ → reusable hooks
+No network cache — repeated visits re-fetch planet/films/starships.
+Next step: React Query or SWR for dedupe, retries, background refresh.
 
-Centralized mocks: __mocks__/mockCharacters.ts power unit tests.
+Skeletons — current loaders for films/starships are text; replace with skeleton UI for polish.
 
-Type safety: shared types; strict TS settings.
+Error states — show inline retry (“Films failed to load — Retry”).
 
-Fast Refresh friendliness: files that export components do not export utilities; hooks/utils live in their own files.
 
-2) Scalability
+# Future Enhancements
 
-Data growth:
+React Query/SWR + normalized cache for people/planets/films/starships
 
-Today: client-side filtering + pagination on the full list.
+Virtualized character list for very large datasets
 
-If people count grows large: switch to server pagination; keep UI API-agnostic.
+Prefetch details data on row hover/focus
 
-Caching: Introduce React Query/SWR for dedupe, background refresh, and retries.
+Server-backed favourites with optimistic updates
 
-Composition: The same pattern can scale to Starships, Planets, etc.
+MSW for more realistic test fixtures & contract testing
 
-Persistence:
 
-Now: localStorage for favourites.
+## Maintainers’ Notes
 
-Later: server-backed profiles to sync across devices.
+The header is persistent (Star Wars + Favourites link).
 
-3) Clarity & Understandability
+On details, the Back button is top-left; the Favourites toggle lives top-right in the toolbar.
 
-Domain naming: CharacterList, Favourites, etc.
+The details grid is responsive; films and starships render in cards (two-column on desktop, stacked on mobile).
 
-Tests as docs: Expectations for list rendering, details lookups, favourite toggling, and name resolution.
-
-
-
-
-*********  If This Became a Multi-Team Foundation *********
-
-1) Repo & Packages
-
-Monorepo with workspaces:
-
-apps/web (this app)
-
-packages/@ui (design system + Storybook)
-
-packages/@types (domain models: Person, Planet, Film, Starship)
-
-packages/@api (generated client from OpenAPI/JSON-Schema; shared fetch layer)
-
-packages/@config (eslint/prettier/tsconfig)
-
-packages/@testing (test utils, MSW handlers)
-
-Ownership: CODEOWNERS per package/feature.
-
-2) Contracts & Data
-
-Source-of-truth schema: OpenAPI/JSON-Schema; generate types + clients.
-
-Contract tests: validate mocks against schema (avoid drift).
-
-MSW in tests and local dev to simulate backend scenarios.
-
-3) Design System & Accessibility
-
-Shared components in @ui with Storybook and visual tests.
-
-A11y: lint rules + axe checks, keyboard navigation, focus management.
-
-i18n: message catalogs + ICU formatting + RTL support.
-
-4) CI/CD & Quality Gates
-
-Pipelines: typecheck, eslint, unit tests, MSW contract tests, e2e (Playwright), a11y checks.
-
-Budgets: bundle size, Lighthouse (web vitals), performance budgets.
-
-Preview deploys per PR.
-
-5) Runtime Ops
-
-Observability: Sentry (errors), RUM/web-vitals, feature usage telemetry.
-
-Feature flags: LaunchDarkly/Unleash for safe rollouts.
-
-Security: Dependabot, npm audit, CSP, SRI, and allowed-list proxies.
-
-6) Data Layer Evolution
-
-React Query/SWR as the standard fetch layer (query keys per entity).
-
-Normalized cache for cross-screen consistency (people/planets/films/starships).
-
-Prefetching on route transitions; stale-while-revalidate.
-
-
-
-
-*********  Future Enhancements *********
-
-Migrate to React Query with query keys: ['people'], ['planet', id], ['film', id], ['starship', id].
-
-Error Boundaries per route segment.
-
-Virtualized lists for very large datasets.
-
-Server pagination + filters when SWAPI (or a proxy) supports it.
-
-Server-backed favourites (user profiles) with optimistic updates.

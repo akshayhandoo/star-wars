@@ -4,14 +4,15 @@ import { usePeople } from "../../../context/usePeople";
 import { personIdFromUrl } from "../../../context/personIdFromUrl";
 import { fetchPlanet } from "../api";
 
-const PAGE_SIZE = 20;
-
 export default function CharactersList() {
   const { people } = usePeople();
   const navigate = useNavigate();
 
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [allSelected, setAllSelected] = useState<boolean>(false);
 
   const [planetNames, setPlanetNames] = useState<Record<string, string>>({});
 
@@ -21,18 +22,32 @@ export default function CharactersList() {
     return people.filter((p) => p.name.toLowerCase().includes(q));
   }, [people, query]);
 
-  if ((page - 1) * PAGE_SIZE >= filtered.length && page !== 1) {
-    setPage(1);
-  }
+  useEffect(() => {
+    if (allSelected) {
+      setPageSize(filtered.length || 1);
+      setPage(1);
+    }
+  }, [filtered.length, allSelected]);
+  
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil((filtered.length || 1) / (pageSize || 1)));
+    if (page > maxPage) setPage(1);
+  }, [filtered.length, page, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const start = (page - 1) * PAGE_SIZE;
-  const current = filtered.slice(start, start + PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / (pageSize || 1)));
+  const start = (page - 1) * pageSize;
+  const current = filtered.slice(start, start + pageSize);
+
+  // Page-size options that adapt to data length
+  const sizeOptions = useMemo(() => {
+    const base = [5, 10, 20, 50, 100];
+    const opts = base.filter((n) => n < filtered.length);
+    return opts;
+  }, [filtered.length]);
 
   useEffect(() => {
-    const urls = [...new Set(current.map((p) => p.homeworld))].filter(Boolean);
+    const urls = [...new Set(current.map((p) => p.homeworld))].filter(Boolean) as string[];
     const toFetch = urls.filter((u) => !(u in planetNames));
-
     if (toFetch.length === 0) return;
 
     Promise.all(
@@ -49,9 +64,23 @@ export default function CharactersList() {
     });
   }, [current, planetNames]);
 
+  const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === "all") {
+      setAllSelected(true);
+      setPageSize(filtered.length || 1);
+    } else {
+      setAllSelected(false);
+      setPageSize(Number(val));
+    }
+    setPage(1);
+  };
+
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
-      <h1 style={{ margin: "0 0 12px" }}>Characters</h1>
+    <div className="page">
+      <div className="page-toolbar">
+        <h1 className="page-title">Characters</h1>
+      </div>
 
       <input
         type="text"
@@ -65,45 +94,66 @@ export default function CharactersList() {
         <p>No characters match your search.</p>
       ) : (
         <>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="characters-table" style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #ddd" }}>Name</th>
                 <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #ddd" }}>Gender</th>
-                <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #ddd" }}>Homeworld</th>
+                <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #ddd" }}>Home Planet</th>
               </tr>
             </thead>
             <tbody>
               {current.map((p) => {
                 const id = personIdFromUrl(p.url);
                 const homeworld = planetNames[p.homeworld] ?? "Loading…";
-
                 return (
                   <tr
                     key={p.url || p.name}
                     onClick={() => id && navigate(`/characters/${id}`)}
                     style={{ cursor: id ? "pointer" : "default" }}
                   >
-                    <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>{p.name}</td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>{p.gender ?? "-"}</td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>{homeworld}</td>
+                    <td data-label="Name" style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>{p.name}</td>
+                    <td data-label="Gender" style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>
+                      {p.gender === "n/a" ? "-" : p.gender}
+                    </td>
+                    <td data-label="Homeworld" style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>{homeworld}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
 
-          {/* Pagination controls */}
-          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12 }}>
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-              Previous
-            </button>
-            <span>
-              Page {page} / {totalPages}
-            </span>
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
-              Next
-            </button>
+          {/* Pagination + page-size controls */}
+          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+                Previous
+              </button>
+              <span>
+                Page {page} / {totalPages}
+              </span>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+                Next
+              </button>
+            </div>
+
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+              <label htmlFor="page-size">Rows per page:</label>
+              <select
+                id="page-size"
+                value={allSelected ? "all" : String(pageSize)}
+                onChange={handlePageSizeChange}
+              >
+                {sizeOptions.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+                {filtered.length > 0 && <option value="all">All ({filtered.length})</option>}
+              </select>
+
+              <span style={{ opacity: 0.8 }}>
+                Showing {filtered.length === 0 ? 0 : start + 1}–{Math.min(start + pageSize, filtered.length)} of {filtered.length}
+              </span>
+            </div>
           </div>
         </>
       )}

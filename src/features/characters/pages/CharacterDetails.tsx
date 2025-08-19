@@ -16,9 +16,12 @@ export default function CharacterDetails() {
     const navigate = useNavigate();
 
     const person = getById(id);
+
     const [planetName, setPlanetName] = useState<string>("");
     const [films, setFilms] = useState<{ title: string }[]>([]);
     const [starships, setStarships] = useState<{ name: string }[]>([]);
+    const [filmsLoading, setFilmsLoading] = useState(false);
+    const [starshipsLoading, setStarshipsLoading] = useState(false);
 
     const [favourites, setFavourites] = useState<FavouriteCharacter[]>(() => {
         try {
@@ -36,27 +39,53 @@ export default function CharacterDetails() {
 
     // Fetch homeworld name if available
     useEffect(() => {
+        let alive = true;
         if (person?.homeworld) {
             fetchPlanet(person.homeworld)
-                .then((planet) => setPlanetName(planet.name))
-                .catch(() => setPlanetName("Unknown"));
+                .then((planet) => alive && setPlanetName(planet.name))
+                .catch(() => alive && setPlanetName("Unknown"));
+        } else {
+            setPlanetName("");
         }
+        return () => {
+            alive = false;
+        };
     }, [person?.homeworld]);
 
+    // Films
     useEffect(() => {
+        let alive = true;
         if (Array.isArray(person?.films) && person.films.length > 0) {
+            setFilmsLoading(true);
             fetchFilms(person.films)
-                .then(setFilms)
-                .catch(() => setFilms([]));
+                .then((data) => alive && setFilms(data))
+                .catch(() => alive && setFilms([]))
+                .finally(() => alive && setFilmsLoading(false));
+        } else {
+            setFilms([]);
+            setFilmsLoading(false);
         }
+        return () => {
+            alive = false;
+        };
     }, [person?.films]);
 
+    // Starships
     useEffect(() => {
+        let alive = true;
         if (Array.isArray(person?.starships) && person.starships.length > 0) {
+            setStarshipsLoading(true);
             fetchStarships(person.starships)
-                .then(setStarships)
-                .catch(() => setStarships([]));
+                .then((data) => alive && setStarships(data))
+                .catch(() => alive && setStarships([]))
+                .finally(() => alive && setStarshipsLoading(false));
+        } else {
+            setStarships([]);
+            setStarshipsLoading(false);
         }
+        return () => {
+            alive = false;
+        };
     }, [person?.starships]);
 
     if (!person) {
@@ -85,68 +114,59 @@ export default function CharacterDetails() {
         }
     };
 
+    const fmt = (v?: string) => {
+        const s = (v ?? "").trim().toLowerCase();
+        if (!s || s === "n/a" || s === "unknown") return "-";
+        return (v ?? "-");
+    };
 
     return (
-        <div style={{ maxWidth: 800, margin: "0 auto", padding: 16 }}>
-            <button onClick={() => navigate(-1)} style={{ marginBottom: 12 }}>
-                ← Back
-            </button>
+        <div className="page">
+            <div className="page-toolbar">
+                <button onClick={() => navigate(-1)} className="back-btn" aria-label="Go back">
+                    ← Back
+                </button>
 
-            <h1 style={{ marginTop: 0 }}>{person.name}</h1>
-
-            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", rowGap: 8 }}>
-                <div>Gender</div>
-                <div>{person.gender ?? "-"}</div>
-
-                <div>Height</div>
-                <div>{person.height ?? "-"}</div>
-
-                <div>Mass</div>
-                <div>{person.mass ?? "-"}</div>
-
-                <div>Birth Year</div>
-                <div>{person.birth_year ?? "-"}</div>
-
-                <div>Homeworld</div>
-                <div>{planetName || "Loading..."}</div>
-            </div>
-
-            <div style={{ marginTop: 16 }}>
                 <button
                     onClick={toggleFavourite}
-                    style={{
-                        padding: "8px 12px",
-                        background: isFavourite ? "crimson" : "#0077ff",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 4,
-                        cursor: "pointer",
-                    }}
+                    className={`fav-btn ${isFavourite ? "active" : ""}`}
+                    aria-pressed={isFavourite}
+                    aria-label={isFavourite ? "Remove from Favourites" : "Add to Favourites"}
+                    title={isFavourite ? "Remove from Favourites" : "Add to Favourites"}
                 >
-                    {isFavourite ? "Remove from Favourites" : "Add to Favourites"}
+                    {isFavourite ? "★ Favourited" : "☆ Add to Favourites"}
                 </button>
             </div>
 
-            {films.length > 0 && (
-                <>
-                    <h3 style={{ marginTop: 16 }}>Films</h3>
-                    <ul>
-                        {films.map((f) => (
-                            <li key={f.title}>{f.title}</li>
-                        ))}
-                    </ul>
-                </>
-            )}
+            <h1 className="page-title">{person.name}</h1>
 
-            {starships.length > 0 && (
-                <>
-                    <h3 style={{ marginTop: 16 }}>Starships</h3>
-                    <ul>
-                        {starships.map((s) => (
-                            <li key={s.name}>{s.name}</li>
-                        ))}
-                    </ul>
-                </>
+            <section className="card details-grid">
+                <div>Hair Colour</div><div>{fmt(person.hair_color)}</div>
+                <div>Eye Colour</div><div>{fmt(person.eye_color)}</div>
+                <div>Gender</div><div>{fmt(person.gender)}</div>
+                <div>Home Planet</div><div>{planetName || "Loading..."}</div>
+            </section>
+
+            {(filmsLoading || films.length > 0 || starshipsLoading || starships.length > 0) && (
+                <div className="two-col">
+                    {(filmsLoading || films.length > 0) && (
+                        <section className="card">
+                            <h3>Films</h3>
+                            {filmsLoading ? <p className="muted">Loading films…</p> : (
+                                <ul style={{ marginLeft: "10px" }}>{films.map((f) => <li key={f.title}>{f.title}</li>)}</ul>
+                            )}
+                        </section>
+                    )}
+
+                    {(starshipsLoading || starships.length > 0) && (
+                        <section className="card">
+                            <h3>Starships</h3>
+                            {starshipsLoading ? <p className="muted">Loading starships…</p> : (
+                                <ul style={{ marginLeft: "10px" }}>{starships.map((s) => <li key={s.name}>{s.name}</li>)}</ul>
+                            )}
+                        </section>
+                    )}
+                </div>
             )}
         </div>
     );

@@ -48,12 +48,11 @@ export default function Favourites() {
   };
 
   return (
-    <div className="favourites-container">
-      <button onClick={() => navigate(-1)} className="back-btn">
-        ← Back
-      </button>
-      <h2 className="page-title">⭐ Favourites</h2>
-
+    <div className="page">
+      <div className="page-toolbar">
+        <button onClick={() => navigate(-1)} className="back-btn">← Back</button>
+      </div>
+      <h1 className="page-title">Favourites</h1>
       {favourites.length === 0 ? (
         <p className="empty-text">No favourites yet</p>
       ) : (
